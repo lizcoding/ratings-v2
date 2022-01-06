@@ -5,6 +5,7 @@ from model import connect_to_db
 import crud
 from jinja2 import StrictUndefined
 
+
 app = Flask(__name__)
 app.secret_key = "dev"
 app.jinja_env.undefined = StrictUndefined
@@ -19,13 +20,28 @@ def homepage():
 @app.route("/movies")
 def all_movies():
     all_movies = crud.get_movies()
-    return render_template("all_movies.html", all_movies=all_movies)
+
+    if session.get("user_id") is None:
+        return redirect("/")
+    else:
+        return render_template("all_movies.html", all_movies=all_movies)
+    
 
 
 @app.route("/movies/<movie_id>")
-def movie_details(movie_id):
-    movie = crud.get_movie_by_id(movie_id)
-    return render_template("movie_details.html", movie=movie)
+def movie_details(movie_id):    
+    rating = crud.get_movie_rating_by_user(session["user_id"], movie_id)
+    if rating:
+        rating = rating[0].score
+    else:
+        rating = 0
+    
+    if session.get("user_id") is None:
+        return redirect("/")
+    else:
+        movie = crud.get_movie_by_id(movie_id)
+        user = crud.get_user_by_id(session["user_id"])
+        return render_template("movie_details.html", movie=movie, rating=rating)
 
 
 @app.route("/users", methods=["POST"])
@@ -66,6 +82,19 @@ def handle_login():
     else:
         flash("Invalid login credentials.")
     return redirect("/")
+
+
+@app.route("/movies/<movie_id>/rating", methods = ["POST"])
+def rate_movie(movie_id):
+    new_rating = request.form.get("rating")
+    movie = crud.get_movie_by_id(movie_id)
+    user = session["user_id"]
+
+    crud.create_rating(user, movie, int(new_rating))
+    rating = crud.get_movie_rating_by_user(session["user_id"], movie_id)[0].score
+
+    return render_template("movie_details.html", movie=movie, rating=rating)
+
 
 if __name__ == "__main__":
     # DebugToolbarExtension(app)
