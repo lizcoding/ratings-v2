@@ -24,8 +24,9 @@ def all_movies():
     if session.get("user_id"):
         return render_template("all_movies.html", all_movies=all_movies)
     else:
+        flash("Please log in")
         return redirect("/")
-    
+
 
 @app.route("/movies/<movie_id>")
 def movie_details(movie_id):    
@@ -62,6 +63,7 @@ def all_users():
         all_users = crud.get_users()
         return render_template("all_users.html", all_users=all_users)
     else:
+        flash("Please log in")
         return redirect("/")
 
 
@@ -78,15 +80,13 @@ def user_profile(user_id):
 def handle_login():
     email = request.form.get("email")
     password = request.form.get("password")
-    if session.get("user_id"): 
-        user = crud.get_user_by_email(email)
+    user = crud.get_user_by_email(email)
+    if user:
         if user.email == email and user.password == password:
             session["user_id"] = user.user_id
             flash("Logged in!")
-        else:
-            flash("Invalid login credentials.")
     else:
-        flash("No user associated with this account.")
+        flash("Invalid login credentials.")
     return redirect("/")
 
 
@@ -97,7 +97,7 @@ def rate_movie(movie_id):
     user = crud.get_user_by_id(session["user_id"])
 
     crud.create_rating(user, movie, new_rating)
-    avg_rating = sum([r.score for r in movie.ratings]) / len([r.score for r in movie.ratings])
+    avg_rating = sum([r.score for r in movie.ratings]) / len(movie.ratings)
     rounded_avg_rating = ("{:.2f}".format(avg_rating))
     return render_template("movie_details.html", movie=movie, rating=rounded_avg_rating)
 
