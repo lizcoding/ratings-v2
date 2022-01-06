@@ -21,26 +21,23 @@ def homepage():
 def all_movies():
     all_movies = crud.get_movies()
 
-    if session.get("user_id") is None:
-        return redirect("/")
-    else:
+    if session.get("user_id"):
         return render_template("all_movies.html", all_movies=all_movies)
+    else:
+        return redirect("/")
     
-
 
 @app.route("/movies/<movie_id>")
 def movie_details(movie_id):    
-    rating = crud.get_movie_rating_by_user(session["user_id"], movie_id)
-    if rating:
-        rating = rating[0].score
-    else:
-        rating = 0
-    
     if session.get("user_id") is None:
         return redirect("/")
     else:
         movie = crud.get_movie_by_id(movie_id)
-        user = crud.get_user_by_id(session["user_id"])
+        if movie.ratings:
+            avg_rating = sum([r.score for r in movie.ratings]) / len([r.score for r in movie.ratings])
+            rating = ("{:.2f}".format(avg_rating))
+        else:
+            rating = ""
         return render_template("movie_details.html", movie=movie, rating=rating)
 
 
@@ -61,39 +58,48 @@ def register_user():
 
 @app.route("/show_users")
 def all_users():
-    all_users = crud.get_users()
-    return render_template("all_users.html", all_users=all_users)
+    if session.get("user_id"): 
+        all_users = crud.get_users()
+        return render_template("all_users.html", all_users=all_users)
+    else:
+        return redirect("/")
 
 
 @app.route("/users/<user_id>")
 def user_profile(user_id):
-    user = crud.get_user_by_id(user_id)
-    return render_template("user_profile.html", user=user)
+    if session.get("user_id"): 
+        user = crud.get_user_by_id(user_id)
+        return render_template("user_profile.html", user=user)
+    else:
+        return redirect("/")
 
 
 @app.route("/login", methods=['POST'])
 def handle_login():
     email = request.form.get("email")
     password = request.form.get("password")
-    user = crud.get_user_by_email(email)
-    if user.email == email and user.password == password:
-        session["user_id"] = user.user_id
-        flash("Logged in!")
+    if session.get("user_id"): 
+        user = crud.get_user_by_email(email)
+        if user.email == email and user.password == password:
+            session["user_id"] = user.user_id
+            flash("Logged in!")
+        else:
+            flash("Invalid login credentials.")
     else:
-        flash("Invalid login credentials.")
+        flash("No user associated with this account.")
     return redirect("/")
 
 
 @app.route("/movies/<movie_id>/rating", methods = ["POST"])
 def rate_movie(movie_id):
-    new_rating = request.form.get("rating")
+    new_rating = int(request.form.get("rating"))
     movie = crud.get_movie_by_id(movie_id)
-    user = session["user_id"]
+    user = crud.get_user_by_id(session["user_id"])
 
-    crud.create_rating(user, movie, int(new_rating))
-    rating = crud.get_movie_rating_by_user(session["user_id"], movie_id)[0].score
-
-    return render_template("movie_details.html", movie=movie, rating=rating)
+    crud.create_rating(user, movie, new_rating)
+    avg_rating = sum([r.score for r in movie.ratings]) / len([r.score for r in movie.ratings])
+    rounded_avg_rating = ("{:.2f}".format(avg_rating))
+    return render_template("movie_details.html", movie=movie, rating=rounded_avg_rating)
 
 
 if __name__ == "__main__":
